@@ -1,0 +1,29 @@
+server:
+  port: 8888
+
+spring:
+  #数据源配置
+  datasource:
+    url: jdbc:mysql://localhost:3306/cyndata
+    username: root2
+    password: 123456
+    driver-class-name: com.mysql.jdbc.Driver
+    type: com.alibaba.druid.pool.DruidDataSource
+
+#  kafka:
+#    #生产者
+#    producer:
+#     bootstrap-servers: localhost:9092
+#    #消费者
+#    consumer:
+#     enable-auto-commit: true #指定消息被消费之后自动提交偏移量
+#     group-id: mytest #消费者
+#     auto-offset-reset: latest #从最近的地方开始消费
+#     bootstrap-servers: localhost:9092
+
+
+mybatis:
+  type-aliases-package: com.spring.boot.mybatis.demo.entity
+  #mapper所在路径
+  mapper-locations: classpath:mapper/*.xml
+
