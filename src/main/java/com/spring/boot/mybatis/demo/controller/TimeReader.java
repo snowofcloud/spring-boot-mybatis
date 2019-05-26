@@ -48,7 +48,7 @@ public class TimeReader {
                 synchronized (lock1) {
                     System.out.println(Thread.currentThread().getName() + "锁住lock1");
                     synchronized (lock2) {
-                        System.out.println(Thread.currentThread().getName() + "锁住lock2");
+                        System.out.println(Thread.currentThread().getName() + " 锁住lock2");
                     }
                 }
             }
