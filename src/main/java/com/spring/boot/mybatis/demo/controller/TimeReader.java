@@ -46,7 +46,7 @@ public class TimeReader {
             @Override
             public void run() {
                 synchronized (lock1) {
-                    System.out.println(Thread.currentThread().getName() + "锁住lock1");
+                    System.out.println(Thread.currentThread().getName() + "锁住 lock1");
                     synchronized (lock2) {
                         System.out.println(Thread.currentThread().getName() + " 锁住lock2");
                     }
