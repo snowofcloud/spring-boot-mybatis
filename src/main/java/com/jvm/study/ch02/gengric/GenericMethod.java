@@ -15,8 +15,8 @@ public class GenericMethod {
     public static void main(String[] args) {
 
         GenericMethod genericMethod = new GenericMethod();
-        System.out.println(genericMethod.genericMethod("cat"));
-        System.out.println(genericMethod.genericMethod(180));
+        System.out.println(genericMethod.<String>genericMethod("cat"));
+        System.out.println(genericMethod.<Integer>genericMethod(180));
     }
 
 }
