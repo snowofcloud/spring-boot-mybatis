@@ -1,12 +1,7 @@
 package com.spring.boot.mybatis.demo.entity;
 
-
 import com.spring.boot.mybatis.demo.controller.ShareBean;
 
-/**
- * @auther xuxq
- * @date 2019/2/19 10:52
- */
 public class Test {
     public void share(ShareItem item, ShareBean.ShareListener listener) {
         if (item == null) {

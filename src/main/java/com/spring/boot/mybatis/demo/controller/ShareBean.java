@@ -1,5 +1,7 @@
 package com.spring.boot.mybatis.demo.controller;
 
+import com.spring.boot.mybatis.demo.entity.TextUtils;
+
 /**
  * @auther xuxq
  * @date 2019/2/19 10:09
@@ -26,53 +28,53 @@ public class ShareBean {
         void onCallback(int state, String msg);
     }
 
-//    public void share (ShareItem item, ShareListener listener) {
-//        if (item != null) {
-//            if (item.type == TYPE_LINK) {
-//                // 分享链接
-//                if (!TextUtils.isEmpty(item.link) && !TextUtils.isEmpty(item.title)) {
-//                    doShareLink(item.link, item.title, item.content, listener);
-//                } else {
-//                    if (listener != null) {
-//                        listener.onCallback(ShareListener.STATE_FAIL, "分享信息不完整");
-//                    }
-//                }
-//            } else if (item.type == TYPE_IMAGE) {
-//                // 分享图片
-//                if (!TextUtils.isEmpty(item.imagePath)) {
-//                    doShareImage(item.imagePath, listener);
-//                } else {
-//                    if (listener != null) {
-//                        listener.onCallback(ShareListener.STATE_FAIL, "分享信息不完整");
-//                    }
-//                }
-//            } else if (item.type == TYPE_TEXT) {
-//                // 分享文本
-//                if (!TextUtils.isEmpty(item.content)) {
-//                    doShareText(item.content, listener);
-//                } else {
-//                    if (listener != null) {
-//                        listener.onCallback(ShareListener.STATE_FAIL, "分享信息不完整");
-//                    }
-//                }
-//            } else if (item.type == TYPE_IMAGE_TEXT) {
-//                // 分享图文
-//                if (!TextUtils.isEmpty(item.imagePath) && !TextUtils.isEmpty(item.content)) {
-//                    doShareImageAndText(item.imagePath, item.content, listener);
-//                } else {
-//                    if (listener != null) {
-//                        listener.onCallback(ShareListener.STATE_FAIL, "分享信息不完整");
-//                    }
-//                }
-//            } else {
-//                if (listener != null) {
-//                    listener.onCallback(ShareListener.STATE_FAIL, "不支持的分享类型");
-//                }
-//            }
-//        } else {
-//            if (listener != null) {
-//                listener.onCallback(ShareListener.STATE_FAIL, "ShareItem 不能为 null");
-//            }
-//        }
-//    }
+    public void share (ShareItem item, ShareListener listener) {
+        if (item != null) {
+            if (item.type == TYPE_LINK) {
+                // 分享链接
+                if (!TextUtils.isEmpty(item.link) && !TextUtils.isEmpty(item.title)) {
+                    //doShareLink(item.link, item.title, item.content, listener);
+                } else {
+                    if (listener != null) {
+                        listener.onCallback(ShareListener.STATE_FAIL, "分享信息不完整");
+                    }
+                }
+            } else if (item.type == TYPE_IMAGE) {
+                // 分享图片
+                if (!TextUtils.isEmpty(item.imagePath)) {
+                    //doShareImage(item.imagePath, listener);
+                } else {
+                    if (listener != null) {
+                        listener.onCallback(ShareListener.STATE_FAIL, "分享信息不完整");
+                    }
+                }
+            } else if (item.type == TYPE_TEXT) {
+                // 分享文本
+                if (!TextUtils.isEmpty(item.content)) {
+                    //doShareText(item.content, listener);
+                } else {
+                    if (listener != null) {
+                        listener.onCallback(ShareListener.STATE_FAIL, "分享信息不完整");
+                    }
+                }
+            } else if (item.type == TYPE_IMAGE_TEXT) {
+                // 分享图文
+                if (!TextUtils.isEmpty(item.imagePath) && !TextUtils.isEmpty(item.content)) {
+                    //doShareImageAndText(item.imagePath, item.content, listener);
+                } else {
+                    if (listener != null) {
+                        listener.onCallback(ShareListener.STATE_FAIL, "分享信息不完整");
+                    }
+                }
+            } else {
+                if (listener != null) {
+                    listener.onCallback(ShareListener.STATE_FAIL, "不支持的分享类型");
+                }
+            }
+        } else {
+            if (listener != null) {
+                listener.onCallback(ShareListener.STATE_FAIL, "ShareItem 不能为 null");
+            }
+        }
+    }
 }

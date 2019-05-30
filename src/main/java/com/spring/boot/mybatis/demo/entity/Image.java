@@ -4,10 +4,7 @@ import com.spring.boot.mybatis.demo.controller.ShareBean;
 
 import static sun.plugin.dom.html.ns4.NS4DOMObject.TYPE_IMAGE;
 
-/**
- * @auther xuxq
- * @date 2019/2/19 10:40
- */
+
 public class Image extends ShareItem {
 
     String imagePath;

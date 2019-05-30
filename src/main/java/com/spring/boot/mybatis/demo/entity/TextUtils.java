@@ -1,9 +1,5 @@
 package com.spring.boot.mybatis.demo.entity;
 
-/**
- * @auther xuxq
- * @date 2019/2/19 10:38
- */
 public class TextUtils {
     /**
      * Returns true if the string is null or 0-length.

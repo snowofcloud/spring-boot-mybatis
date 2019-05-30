@@ -12,37 +12,37 @@ public class TimeReader {
     public static void main(String[] args) {
         /*死锁*/
 
-//        Thread t1 = new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                synchronized (lock1) {
-//                    System.out.println(Thread.currentThread().getName() + "锁住lock1");
-//                    synchronized (lock2) {
-//                        System.out.println(Thread.currentThread().getName() + "锁住lock2");
-//                    }
-//                }
-//            }
-//        },"t11");
-//
-//        Thread t2 = new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                synchronized (lock2) {
-//                    System.out.println(Thread.currentThread().getName() + "锁住lock2");
-//                    synchronized (lock1) {
-//                        System.out.println(Thread.currentThread().getName() + "锁住lock1");
-//                    }
-//                }
-//            }
-//        },"t22");
-//
-//        t1.start();
-//        t2.start();
+        Thread t1 = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock1) {
+                    System.out.println(Thread.currentThread().getName() + "锁住lock1");
+                    synchronized (lock2) {
+                        System.out.println(Thread.currentThread().getName() + "锁住lock2");
+                    }
+                }
+            }
+        },"t11");
+
+        Thread t2 = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock2) {
+                    System.out.println(Thread.currentThread().getName() + "锁住lock2");
+                    synchronized (lock1) {
+                        System.out.println(Thread.currentThread().getName() + "锁住lock1");
+                    }
+                }
+            }
+        },"t22");
+
+        t1.start();
+        t2.start();
 
 
         /*解开死锁*/
 
-        Thread t1 = new Thread(new Runnable() {
+        Thread t11 = new Thread(new Runnable() {
             @Override
             public void run() {
                 synchronized (lock1) {
@@ -54,7 +54,7 @@ public class TimeReader {
             }
         },"t11");
 
-        Thread t2 = new Thread(new Runnable() {
+        Thread t22 = new Thread(new Runnable() {
             @Override
             public void run() {
                 synchronized (lock1) {
