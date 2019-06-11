@@ -1,5 +1,7 @@
 package com.jvm.study.ch02.gengric;
 
+import java.util.Stack;
+
 public class NormalGeneric<T> {
 
     /**泛型类
