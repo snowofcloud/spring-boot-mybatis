@@ -21,6 +21,7 @@ public class KafkaConsumer {
         ConcurrentHashMap<String, String> concurrentHashMap = new ConcurrentHashMap<>();
         //ConcurrentHashMap一般不用size判断容器大小，因为它要统计每个分段锁元素个数，比较耗时，使用isEmpty()
 
+
         logger.info("test topic message : {}", message);
     }
 }

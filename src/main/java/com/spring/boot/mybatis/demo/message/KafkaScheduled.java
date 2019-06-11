@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+
 /**
  * @auther xuxq
  * @date 2019/1/29 11:21
@@ -19,7 +21,10 @@ public class KafkaScheduled {
     @Scheduled(fixedRate = 1000 * 20)
     public void testKafka() throws Exception {
         logger.info("KafkaScheduled...start");
+
         kafkaSender.sendTest();
+
+        HashMap<String, Integer> hashMap = new HashMap<>();
     }
 }
 
