@@ -1,0 +1,601 @@
+
+
+Java为数据结构中的映射定义了一个接口java.util.Map，此接口主要有四个常用的实现类，分别是HashMap、Hashtable、LinkedHashMap和TreeMap，类继承关系如下图所示：
+	HashMap：线程不安全;
+	Hashtable：线程安全，每个线程都加锁，但性能低下;
+	LinkedHashMap：
+	TreeMap：
+    下面针对各个实现类的特点做一些说明：{
+		(1) HashMap：它根据键的hashCode值存储数据，大多数情况下可以直接定位到它的值，因而具有很快的访问速度，但遍历顺序却是不确定的。
+			HashMap最多只允许一条记录的键为null，允许多条记录的值为null。HashMap非线程安全，即任一时刻可以有多个线程同时写HashMap，可能会导致数据的不一致。
+				如果需要满足线程安全，可以用 Collections的synchronizedMap方法使HashMap具有线程安全的能力，或者使用ConcurrentHashMap。
+
+		(2) Hashtable：Hashtable是遗留类，很多映射的常用功能与HashMap类似，不同的是它承自Dictionary类，并且是线程安全的，任一时间只有一个线程能写Hashtable，
+			并发性不如ConcurrentHashMap，因为ConcurrentHashMap引入了分段锁。Hashtable不建议在新代码中使用，不需要线程安全的场合可以用HashMap替换，
+			需要线程安全的场合可以用ConcurrentHashMap替换。
+
+		(3) LinkedHashMap：LinkedHashMap是HashMap的一个子类，保存了记录的插入顺序，在用Iterator遍历LinkedHashMap时，先得到的记录肯定是先插入的，也可以在构造时带参数，
+			按照访问次序排序。
+
+		(4) TreeMap：TreeMap实现SortedMap接口，能够把它保存的记录根据键排序，默认是按键值的升序排序，也可以指定排序的比较器，当用Iterator遍历TreeMap时，得到的记录是排过序的。
+			如果使用排序的映射，建议使用TreeMap。在使用TreeMap时，key必须实现Comparable接口或者在构造TreeMap传入自定义的Comparator，
+			否则会在运行时抛出java.lang.ClassCastException类型的异常。
+
+		对于上述四种Map类型的类，要求映射中的key是不可变对象。不可变对象是该对象在创建后它的哈希值不会被改变。如果对象的哈希值发生变化，Map对象很可能就定位不到映射的位置了。
+	}
+
+	通过上面的比较，我们知道了HashMap是Java的Map家族中一个普通成员，鉴于它可以满足大多数场景的使用条件，所以是使用频度最高的一个。
+	下文我们主要结合源码，从存储结构、常用方法分析、扩容以及安全性等方面深入讲解HashMap的工作原理。	
+	
+	
+	JDK1.8/对HashMap底层的实现进行了优化，例如引入红黑树的数据结构和扩容的优化等。本文结合JDK7和JDK8的区别，深入探讨HashMap的结构实现和功能原理。
+	深入探讨HashMap的底层结构、原理、扩容机制；{
+		参考资料：http://youzhixueyuan.com/the-underlying-structure-and-principle-of-hashmap.html
+	
+		HashMap是java程序员使用频率最高的用于映射(键值对)处理的数据类型。
+		
+		内部实现，搞清楚HashMap，
+			首先需要知道HashMap是什么，即它的存储结构-字段；
+			其次弄明白它能干什么，即它的功能实现-方法。
+		
+	}
+	//待续补充资料，
+	HashMap线程是不安全的，多线程情况下容易引发死循环，导致CPU利用率接近100%，并发情况下不能使用HashMap；
+	
+	
+	HashSet底层实现基于HashMap实现的，
+	
+	
+	
+	HashMap迭代器和增强for循环遍历：{
+		public static void main(String[] args) {
+			Map<String, String> map = new HashMap<>();
+			Map<String, String> map1 = Collections.synchronizedMap(map);//线程安全
+			map.put("牛郎","织女");
+			map.put("梁山伯","祝英台");
+			map.put("司马相如","卓文君");
+			//map.
+			//迭代器遍历 法一：
+			Set<String> keySet = map.keySet();            //利用map的keySet方法，将集合中的key封装到set集合中
+			Iterator<String> iterator = keySet.iterator();//获取迭代器
+			while(iterator.hasNext()){
+				String key = iterator.next();
+				String value = map.get(key);
+				System.out.println(key + "=" + value);
+			}
+			System.out.println("=====================================================================");
+			//迭代器遍历 法二：
+			Set<Map.Entry<String, String>> entries = map.entrySet(); //利用map的entrySet方法，将键值封装到entry中
+			Iterator<Map.Entry<String, String>> iterator1 = entries.iterator();
+			while (iterator1.hasNext()){
+				Map.Entry<String, String> next = iterator1.next();
+				String key = next.getKey();
+				String value = next.getValue();
+				System.out.println(key + "=" + value);
+
+			}
+			System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+			//增强for循环
+			for (String s: keySet) {
+				String s1 = map.get(s);
+				System.out.println(s + "=" + s1);
+			}
+			System.out.println("=====================================================================");
+			for (Map.Entry<String, String> entry: entries){
+				String key = entry.getKey();
+				String value = entry.getValue();
+				System.out.println(key + "=" + value);
+			}
+
+		}
+	}
+
+	
+	HashMap:{
+		//参考资料：https://mp.weixin.qq.com/s/y6hswv2hIm3hAW18SCZYHg
+		1/为什么用HashMap？{
+			HashMap是一个散列桶（数组和链表），它存储的内容是键值对(key-value)映射
+			HashMap采用了数组和链表的数据结构，能在查询和修改方便继承了数组的线性查找和链表的寻址修改
+			HashMap是非synchronized，所以HashMap很快
+			HashMap可以接受null键和值，而Hashtable则不能（原因就是equlas()方法需要对象，因为HashMap是后出的API经过处理才可以）
+		}
+		
+		2/HashMap的工作原理是什么？{
+			HashMap是基于hashing的原理，我们使用put(key, value)存储对象到HashMap中，使用get(key)从HashMap中获取对象。
+				当我们给put()方法传递键和值时，我们先对键调用hashCode()方法，计算并返回的hashCode是用于找到Map数组的bucket位置来储存Node 对象。
+				这里关键点在于指出，HashMap是在bucket中储存键对象和值对象，作为Map.Node 。
+			具体的put过程（JDK1.8版）
+				1/对Key求Hash值，然后再计算下标
+				2/如果没有碰撞，直接放入桶中（碰撞的意思是计算得到的Hash值相同，需要放到同一个bucket中）
+				3/如果碰撞了，以链表的方式链接到后面
+				4/如果链表长度超过阀值( TREEIFY THRESHOLD==8)，就把链表转成红黑树，链表长度低于6，就把红黑树转回链表
+				5/如果节点已经存在就替换旧值
+				6/如果桶满了(容量16*加载因子0.75)，就需要 resize（扩容2倍后重排）
+			以下是具体get过程(考虑特殊情况如果两个键的hashcode相同，你如何获取值对象？)
+				当我们调用get()方法，HashMap会使用键对象的hashcode找到bucket位置，找到bucket位置之后，会调用keys.equals()方法去找到链表中正确的节点，最终找到要找的值对象。
+			
+		}
+		
+		3/有什么方法可以减少碰撞？{
+			扰动函数可以减少碰撞，原理是如果两个不相等的对象返回不同的hashcode的话，那么碰撞的几率就会小些，这就意味着存链表结构减小，这样取值的话就不会频繁调用equal方法，这样就能提高HashMap的性能。
+				（扰动即Hash方法内部的算法实现，目的是让不同对象返回不同hashcode。）
+
+			使用不可变的、声明作final的对象，并且采用合适的equals()和hashCode()方法的话，将会减少碰撞的发生。不可变性使得能够缓存不同键的hashcode，这将提高整个获取对象的速度，
+				使用String，Interger这样的wrapper类作为键是非常好的选择。为什么String, Interger这样的wrapper类适合作为键？因为String是final的，而且已经重写了equals()和hashCode()方法了。
+				不可变性是必要的，因为为了要计算hashCode()，就要防止键值改变，如果键值在放入时和获取时返回不同的hashcode的话，那么就不能从HashMap中找到你想要的对象。
+		}
+		
+		4/HashMap中hash函数怎么是是实现的?{
+			我们可以看到在hashmap中要找到某个元素，需要根据key的hash值来求得对应数组中的位置。
+				如何计算这个位置就是hash算法。
+				前面说过hashmap的数据结构是数组和链表的结合，所以我们当然希望这个hashmap里面的元素位置尽量的分布均匀些，尽量使得每个位置上的元素数量只有一个，那么当我们用hash算法求得这个位置的时候，
+				马上就可以知道对应位置的元素就是我们要的，而不用再去遍历链表。 
+				所以我们首先想到的就是把hashcode对数组长度取模运算，这样一来，元素的分布相对来说是比较均匀的。
+				
+				但是，“模”运算的消耗还是比较大的，能不能找一种更快速，消耗更小的方式，我们来看看JDK1.8的源码是怎么做的.
+				
+				
+		}
+		
+		5/拉链法导致的链表过深问题为什么不用二叉查找树代替，而选择红黑树？为什么不一直使用红黑树？{
+			之所以选择红黑树是为了解决二叉查找树的缺陷，二叉查找树在特殊情况下会变成一条线性结构（这就跟原来使用链表结构一样了，造成很深的问题），遍历查找会非常慢。
+				而红黑树在插入新数据后可能需要通过左旋，右旋、变色这些操作来保持平衡，引入红黑树就是为了查找数据快，解决链表查询深度的问题，
+				我们知道红黑树属于平衡二叉树，但是为了保持“平衡”是需要付出代价的，但是该代价所损耗的资源要比遍历线性链表要少，所以当长度大于8的时候，会使用红黑树，
+				如果链表长度很短的话，根本不需要引入红黑树，引入反而会慢。
+		}
+		
+		6/说说你对红黑树的见解？{
+			1/每个节点非红即黑
+			2/根节点总是黑色的
+			3/如果节点是红色的，则它的子节点必须是黑色的（反之不一定）
+			4/每个叶子节点都是黑色的空节点（NIL节点）
+			5/从根节点到叶节点或空子节点的每条路径，必须包含相同数目的黑色节点（即相同的黑色高度）
+		}
+		
+		7/解决hash 碰撞还有那些办法？{
+			开放定址法。
+			当冲突发生时，使用某种探查技术在散列表中形成一个探查(测)序列。沿此序列逐个单元地查找，直到找到给定的地址。
+			按照形成探查序列的方法不同，可将开放定址法区分为线性探查法、二次探查法、双重散列法等。
+		}
+		
+		8/如果HashMap的大小超过了负载因子(load factor)定义的容量，怎么办？{
+			默认的负载因子大小为0.75，也就是说，当一个map填满了75%的bucket时候，和其它集合类(如ArrayList等)一样，将会创建原来HashMap大小的两倍的bucket数组，来重新调整map的大小，并将原来的对象放入新的bucket数组中。
+				这个过程叫作rehashing，因为它调用hash方法找到新的bucket位置。这个值只可能在两个地方，一个是原下标的位置，另一种是在下标为<原下标+原容量>的位置　
+		}
+		
+		9/重新调整HashMap大小存在什么问题吗？{
+			
+		}
+		
+		10/HashTable{
+			数组 + 链表方式存储
+
+			默认容量： 11(质数 为宜)
+
+			put:
+
+			- 索引计算 : （key.hashCode() & 0x7FFFFFFF）% table.length
+
+			若在链表中找到了，则替换旧值，若未找到则继续
+
+			当总元素个数超过容量*加载因子时，扩容为原来 2 倍并重新散列。
+			
+			将新元素加到链表头部
+			
+			对修改 Hashtable 内部共享数据的方法添加了 synchronized，保证线程安全。
+			
+		}
+		
+		11/HashMap ，HashTable 区别{
+			默认容量不同。扩容不同
+
+			线程安全性，HashTable 安全
+
+			效率不同 HashTable 要慢因为加锁
+		}
+		
+		12/ConcurrentHashMap 原理{
+			1/最大特点是引入了 CAS（借助 Unsafe 来实现【native code】）
+				CAS有3个操作数，内存值V，旧的预期值A，要修改的新值B。当且仅当预期值A和内存值V相同时，将内存值V修改为B，否则什么都不做。
+				Unsafe 借助 CPU 指令 cmpxchg 来实现
+				使用实例：
+					1、对 sizeCtl 的控制都是用 CAS 来实现的
+					1、sizeCtl ：默认为0，用来控制 table 的初始化和扩容操作。
+						-1 代表table正在初始化
+						N 表示有 -N-1 个线程正在进行扩容操作
+						如果table未初始化，表示table需要初始化的大小。
+						如果table初始化完成，表示table的容量，默认是table大小的0.75倍，居然用这个公式算0.75（n - (n >>> 2)）。
+			2/CAS 会出现的问题：ABA
+				对变量增加一个版本号，每次修改，版本号加 1，比较的时候比较版本号；
+		}
+		
+		13/我们可以使用CocurrentHashMap来代替Hashtable吗？{
+			我们知道Hashtable是synchronized的，但是ConcurrentHashMap同步性能更好，因为它仅仅根据同步级别对map的一部分进行上锁。
+			ConcurrentHashMap当然可以代替HashTable，但是HashTable提供更强的线程安全性。
+			它们都可以用于多线程的环境，但是当Hashtable的大小增加到一定的时候，性能会急剧下降，因为迭代时需要被锁定很长的时间。
+			因为ConcurrentHashMap引入了分割(segmentation)，不论它变得多么大，仅仅需要锁定map的某个部分，而其它的线程不需要等到迭代完成才能访问map。简而言之，在迭代的过程中，ConcurrentHashMap仅仅锁定map的某个部分，而Hashtable则会锁定整个map。
+		}
+		
+		14/CocurrentHashMap在JAVA8中存在一个bug，会进入死循环，原因是递归创建{
+			ConcurrentHashMap 对象，但是在1.9已经修复了,场景重现如下：
+				public class ConcurrentHashMapDemo{
+
+					private Map<Integer,Integer> cache =new ConcurrentHashMap<>(15);
+
+					public static void main(String[]args){
+						ConcurrentHashMapDemo ch =    new ConcurrentHashMapDemo();
+						System.out.println(ch.fibonaacci(80));
+					}
+
+					public int fibonaacci(Integer i){
+						if(i==0||i ==1) {
+							return i;
+					}
+
+					return cache.computeIfAbsent(i,(key) -> {
+						System.out.println("fibonaacci : "+key);
+						return fibonaacci(key -1)+fibonaacci(key - 2);
+					});
+
+					}
+				}
+		}
+			
+	}
+
+
+	HashMap实现原理及源码分析:{
+		参考资料：https://www.cnblogs.com/chengxiao/p/6059914.html
+		哈希表（hash table）也叫散列表，是一种非常重要的数据结构，应用场景及其丰富，许多缓存技术（比如memcached）的核心其实就是在内存中维护一张大的哈希表，
+			而HashMap的实现原理也常常出现在各类的面试题中，重要性可见一斑。
+		一、什么是哈希表
+		二、HashMap实现原理
+			//HashMap的主干数组，可以看到就是一个Entry数组，初始值为空数组{}，主干数组的长度一定是2的次幂，至于为什么这么做，后面会有详细分析。
+			transient Entry<K,V>[] table = (Entry<K,V>[]) EMPTY_TABLE;
+			
+			简单来说，HashMap由数组+链表组成的，数组是HashMap的主体，链表则是主要为了解决哈希冲突而存在的，如果定位到的数组位置不含链表（当前entry的next指向null）,
+				那么对于查找，添加等操作很快，仅需一次寻址即可；
+				如果定位到的数组包含链表，对于添加操作，其时间复杂度为O(n)，首先遍历链表，存在即覆盖，否则新增；对于查找操作来讲，仍需遍历链表，
+				然后通过key对象的equals方法逐一比对查找。所以，性能考虑，HashMap中的链表出现越少，性能才会越好。
+		
+		三、为何HashMap的数组长度一定是2的次幂？
+			
+		
+		四、重写equals方法需同时重写hashCode方法：{
+			由于hashcode1不等于hashcode2，导致没有定位到一个数组位置而返回逻辑上错误的值null（也有可能碰巧定位到一个数组位置，但是也会判断其entry的hash值是否相等，上面get方法中有提到。）
+
+　　		所以，在重写equals的方法的时候，必须注意重写hashCode方法，同时还要保证通过equals判断相等的两个对象，调用hashCode方法要返回同样的整数值。
+				而如果equals判断不相等的两个对象，其hashCode可以相同（只不过会发生哈希冲突，应尽量避免）。
+		}
+		
+	}
+
+	Java1.8/中HashMap的实现原理：{
+		https://blog.csdn.net/qq_37113604/article/details/81353626
+		
+		put方法：{
+			public V put(K key, V value) {
+				return putVal(hash(key), key, value, false, true);
+			}
+			final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
+						   boolean evict) {
+				Node<K,V>[] tab; Node<K,V> p; int n, i;
+				if ((tab = table) == null || (n = tab.length) == 0)
+					n = (tab = resize()).length;
+				if ((p = tab[i = (n - 1) & hash]) == null)
+					tab[i] = newNode(hash, key, value, null);
+				else {
+					Node<K,V> e; K k;
+					if (p.hash == hash &&
+						((k = p.key) == key || (key != null && key.equals(k))))
+						e = p;
+					else if (p instanceof TreeNode)
+						e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
+					else {
+						for (int binCount = 0; ; ++binCount) {
+							if ((e = p.next) == null) {
+								p.next = newNode(hash, key, value, null);
+								if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+									treeifyBin(tab, hash);
+								break;
+							}
+							if (e.hash == hash &&
+								((k = e.key) == key || (key != null && key.equals(k))))
+								break;
+							p = e;
+						}
+					}
+					if (e != null) { // existing mapping for key
+						V oldValue = e.value;
+						if (!onlyIfAbsent || oldValue == null)
+							e.value = value;
+						afterNodeAccess(e);
+						return oldValue;
+					}
+				}
+				++modCount;
+				if (++size > threshold)
+					resize();
+				afterNodeInsertion(evict);
+				return null;
+			}
+		}
+		
+		get方法：{
+			public V get(Object key) {
+				Node<K,V> e;
+				return (e = getNode(hash(key), key)) == null ? null : e.value;
+			}
+
+			/**
+			 * Implements Map.get and related methods
+			 *
+			 * @param hash hash for key
+			 * @param key the key
+			 * @return the node, or null if none
+			 */
+			final Node<K,V> getNode(int hash, Object key) {
+				Node<K,V>[] tab; Node<K,V> first, e; int n; K k;
+				if ((tab = table) != null && (n = tab.length) > 0 &&
+					(first = tab[(n - 1) & hash]) != null) {
+					if (first.hash == hash && // always check first node
+						((k = first.key) == key || (key != null && key.equals(k))))
+						return first;
+					if ((e = first.next) != null) {
+						if (first instanceof TreeNode)
+							return ((TreeNode<K,V>)first).getTreeNode(hash, key);
+						do {
+							if (e.hash == hash &&
+								((k = e.key) == key || (key != null && key.equals(k))))
+								return e;
+						} while ((e = e.next) != null);
+					}
+				}
+				return null;
+			}
+		}
+		
+		
+	}
+	
+	Java1.7/中HashMap的实现原理：{
+		//参考资料：https://www.cnblogs.com/yuanblog/p/4441017.html
+		一、Java中的hashCode和equals
+		二、HashMap的实现原理
+			1/HashMap概述
+				HashMap是基于哈希表的Map接口的非同步实现。此实现提供所有可选的映射操作，并允许使用null值和null键。此类不保证映射的顺序，特别是它不保证该顺序恒久不变。
+				在java编程语言中，最基本的结构就是两种，一个是数组，另外一个是模拟指针（引用），所有的数据结构都可以用这两个基本结构来构造的，HashMap也不例外。
+				HashMap实际上是一个“链表散列”的数据结构，即数组和链表的结合体。
+			
+				从上图中可以看出，HashMap底层就是一个数组结构，数组中的每一项又是一个链表。当新建一个HashMap的时候，就会初始化一个数组。{
+					/**
+					 * The table, resized as necessary. Length MUST Always be a power of two.
+					 */
+					transient Entry[] table;
+					
+					static class Entry<K,V> implements Map.Entry<K,V> {
+						final K key;
+						V value;
+						Entry<K,V> next;
+						final int hash;
+						……
+					}
+				}
+		
+			2/HashMap实现存储和读取
+				1）存储
+				代码：{
+					public V put(K key, V value) {
+						//如果table数组为空数组{}，进行数组填充（为table分配实际内存空间），入参为threshold，此时threshold为initialCapacity 默认是1<<4(2 4=16)
+						if (table == EMPTY_TABLE) {
+							inflateTable(threshold);
+						}
+						// HashMap允许存放null键和null值。
+						// 当key为null时，调用putForNullKey方法，将value放置在数组第一个位置。
+						if (key == null)
+							return putForNullKey(value);
+						// 根据key的keyCode重新计算hash值。
+						int hash = hash(key.hashCode());
+						// 搜索指定hash值在对应table中的索引。
+						int i = indexFor(hash, table.length);
+						// 如果 i 索引处的 Entry 不为 null，通过循环不断遍历 e 元素的下一个元素。
+						for (Entry<K,V> e = table[i]; e != null; e = e.next) {
+							Object k;
+							if (e.hash == hash && ((k = e.key) == key || key.equals(k))) {
+								// 如果发现已有该键值，则存储新的值，并返回原始值
+								 V oldValue = e.value;
+								 e.value = value;
+								 e.recordAccess(this);
+								 return oldValue;
+							}
+						 }
+						 // 如果i索引处的Entry为null，表明此处还没有Entry。
+						 modCount++;
+						 // 将key、value添加到i索引处。
+						 addEntry(hash, key, value, i);
+						 return null;
+					}
+				}
+				根据hash值得到这个元素在数组中的位置（即下标），如果数组该位置上已经存放有其他元素了，那么在这个位置上的元素将以链表的形式存放，新加入的放在链头，最先加入的放在链尾。
+					如果数组该位置上没有元素，就直接将该元素放到此数组中的该位置上。
+				hash(int h)方法根据key的hashCode重新计算一次散列。此算法加入了高位计算，防止低位不变，高位变化时，造成的hash冲突。
+				static int hash(int h) {
+				    h ^= (h >>> 20) ^ (h >>> 12);
+				    return h ^ (h >>> 7) ^ (h >>> 4);
+				}
+				我们可以看到在HashMap中要找到某个元素，需要根据key的hash值来求得对应数组中的位置。如何计算这个位置就是hash算法。
+					前面说过HashMap的数据结构是数组和链表的结合，所以我们当然希望这个HashMap里面的元素位置尽量的分布均匀些，尽量使得每个位置上的元素数量只有一个，
+					那么当我们用hash算法求得这个位置的时候，马上就可以知道对应位置的元素就是我们要的，而不用再去遍历链表，这样就大大优化了查询的效率。
+
+				根据上面put方法的源代码可以看出，当程序试图将一个key-value对放入HashMap中时，程序首先根据该key的hashCode()返回值决定该Entry的存储位置：
+					如果这两个Entry的key的hashCode()返回值相同，那它们的存储位置相同。
+					如果这两个Entry的key通过equals比较返回true，新添加Entry的value将覆盖集合中原有Entry的value，但key不会覆盖。
+					如果这两个Entry的key通过equals比较返回false，新添加的Entry将与集合中原有Entry形成Entry链，而且新添加的Entry位于Entry链的头部——具体说明继续看addEntry()方法的说明。
+				通过这种方式就可以高效的解决HashMap的冲突问题。
+				2）读取
+				代码：{
+					public V get(Object key) {
+						if (key == null)
+							return getForNullKey();
+						int hash = hash(key.hashCode());
+						for (Entry<K,V> e = table[indexFor(hash, table.length)];
+							e != null;
+							e = e.next) {
+							Object k;
+							if (e.hash == hash && ((k = e.key) == key || key.equals(k)))
+								return e.value;
+						}
+						return null;
+					}
+				}
+				从HashMap中get元素时，首先计算key的hashCode，找到数组中对应位置的某一元素，然后通过key的equals方法在对应位置的链表中找到需要的元素。
+				3）归纳起来简单地说，
+				HashMap在底层将 key-value 当成一个整体进行处理，这个整体就是一个 Entry 对象。
+				HashMap底层采用一个Entry[]数组来保存所有的key-value对，当需要存储一个Entry对象时，会根据hash算法来决定其在数组中的存储位置，在根据equals方法决定其在该数组位置上的链表中的存储位置；
+				当需要取出一个Entry时，也会根据hash算法找到其在数组中的存储位置，再根据equals方法从该位置上的链表中取出该Entry。
+			3/HashMap的resize
+				 当hashmap中的元素越来越多的时候，碰撞的几率也就越来越高（因为数组的长度是固定的），所以为了提高查询的效率，就要对hashmap的数组进行扩容，
+					数组扩容这个操作也会出现在ArrayList中，所以这是一个通用的操作，很多人对它的性能表示过怀疑，不过想想我们的“均摊”原理，就释然了，
+					而在hashmap数组扩容之后，最消耗性能的点就出现了：原数组中的数据必须重新计算其在新数组中的位置，并放进去，这就是resize。
+				那么hashmap什么时候进行扩容呢？
+					当hashmap中的元素个数超过数组大小*loadFactor时，就会进行数组扩容，loadFactor的默认值为0.75，//经验值为0.75；
+					也就是说，默认情况下，数组大小为16，那么当hashmap中元素个数超过16*0.75=12的时候，就把数组的大小扩展为2*16=32，即扩大一倍，然后重新计算每个元素在数组中的位置，而这是一个非常消耗性能的操作，
+					所以如果我们已经预知hashmap中元素的个数，那么预设元素的个数能够有效的提高hashmap的性能。
+					比如说，我们有1000个元素new HashMap(1000), 但是理论上来讲new HashMap(1024)更合适，不过上面annegu已经说过，即使是1000，hashmap也自动会将其设置为1024。 
+						但是new HashMap(1024)还不是更合适的，因为0.75*1000 < 1000, 也就是说为了让0.75 * size > 1000, 我们必须这样new HashMap(2048)才最合适，既考虑了&的问题，也避免了resize的问题。
+				
+				
+	}
+
+	
+	==和equals()：{
+
+		我们知道计算机归根到底进行的只是一些二进制数的与或非运算，加法乘法运算。由此有了些基本的运算符，所有的函数本质上其实现都是使用基本运算符来实现的。
+		而==是基本运算符中的一个，它的作用：用于比较引用和比较基本数据类型时具有不同的功能：
+			比较基本数据类型，如果两个值相同，则结果为true
+			而在比较引用时，如果引用指向内存中的同一对象，结果为true
+
+		而equals()作为方法，我们可以推测知道，它其中的实现所使用的肯定是==运算符。
+		再进一步的思考，equals()本意不正是==运算符进行对象比较时候的作用吗。
+			那么，既然是两者有同样的作用，为什么还要弄出一个equals()方法来呢。因为==运算符不允许我们进行覆盖，也就是说它限制了我们的表达。在上面的第三个例子中，我们复写equals()方法，达到比较对象内容是否相同的目的。而这些通过==运算符是做不到的。
+		
+}
+
+
+ConcurrentHashMap：{
+	
+	
+	ConcurrentHashMap与HashMap等的区别：{
+		1/HashMap
+			我们知道HashMap是线程不安全的，在多线程环境下，使用Hashmap进行put操作会引起死循环，导致CPU利用率接近100%，所以在并发情况下不能使用HashMap。
+		
+		2/HashTable
+			HashTable和HashMap的实现原理几乎一样，差别无非是
+			  HashTable不允许key和value为null
+			  HashTable是线程安全的
+			但是HashTable线程安全的策略实现代价却太大了，简单粗暴，get/put所有相关操作都是synchronized的，这相当于给整个哈希表加了一把大锁。
+			多线程访问时候，只要有一个线程访问或操作该对象，那其他线程只能阻塞，相当于将所有的操作串行化，在竞争激烈的并发场景中性能就会非常差。
+
+		3/ConcurrentHashMap
+
+			主要就是为了应对hashmap在并发环境下不安全而诞生的，ConcurrentHashMap的设计与实现非常精巧，大量的利用了volatile，final，CAS等lock-free技术来减少锁竞争对于性能的影响。
+			我们都知道Map一般都是数组+链表结构（JDK1.8该为数组+红黑树）。
+			高并发编程系列：ConcurrentHashMap的实现原理(JDK1.7和JDK1.8)
+			ConcurrentHashMap避免了对全局加锁改成了局部加锁操作，这样就极大地提高了并发环境下的操作速度，由于ConcurrentHashMap在JDK1.7和1.8中的实现非常不同，
+				接下来我们谈谈JDK在1.7和1.8中的区别。
+	}
+	
+	
+	JDK1.7/版本的CurrentHashMap的实现原理：{
+		
+		在JDK7中ConcurrentHashMap采用了数组+Segment+分段锁的方式实现。
+		1.Segment(分段锁)
+			ConcurrentHashMap中的分段锁称为Segment，它即类似于HashMap的结构，即内部拥有一个Entry数组，数组中的每个元素又是一个链表,同时又是一个ReentrantLock（Segment继承了ReentrantLock）。
+		2.内部结构
+			ConcurrentHashMap使用分段锁技术，将数据分成一段一段的存储，然后给每一段数据配一把锁，当一个线程占用锁访问其中一个段数据的时候，
+				其他段的数据也能被其他线程访问，能够实现真正的并发访问。如下图是ConcurrentHashMap的内部结构图：
+			从上面的结构我们可以了解到，ConcurrentHashMap定位一个元素的过程需要进行两次Hash操作。
+				第一次Hash定位到Segment，第二次Hash定位到元素所在的链表的头部。
+
+		3.该结构的优劣势
+		坏处
+			这一种结构的带来的副作用是Hash的过程要比普通的HashMap要长
+		好处
+			写操作的时候可以只对元素所在的Segment进行加锁即可，不会影响到其他的Segment，这样，在最理想的情况下，
+				ConcurrentHashMap可以最高同时支持Segment数量大小的写操作（刚好这些写操作都非常平均地分布在所有的Segment上）。
+		所以，通过这一种结构，ConcurrentHashMap的并发能力可以大大的提高。
+		
+		
+		新资料：https://blog.csdn.net/lixingtao0520/article/details/83387065
+			JDK1.7中ConcurrentHashMap是通过segments数组和HashEntry数组+链表来进行实现的。利用锁分段技术，支持任务数量线程的读和一定数量线程的写；
+		
+	}
+	
+	
+	JDK1.8/版本的CurrentHashMap的实现原理：{
+		JDK8中ConcurrentHashMap参考了JDK8 HashMap的实现，采用了数组+链表+红黑树的实现方式来设计，内部大量采用CAS操作，这里我简要介绍下CAS。
+		CAS是compare and swap的缩写，即我们所说的比较交换。cas是一种基于锁的操作，而且是乐观锁。在java中锁分为乐观锁和悲观锁。悲观锁是将资源锁住，等一个之前获得锁的线程释放锁之后，
+			下一个线程才可以访问。而乐观锁采取了一种宽泛的态度，通过某种方式不加锁来处理资源，比如通过给记录加version来获取数据，性能较悲观锁有很大的提高。
+		CAS 操作包含三个操作数 —— 内存位置（V）、预期原值（A）和新值(B)。如果内存地址里面的值和A的值是一样的，那么就将内存里面的值更新成B。CAS是通过无限循环来获取数据的，
+			若果在第一轮循环中，a线程获取地址里面的值被b线程修改了，那么a线程需要自旋，到下次循环才有可能机会执行。
+		
+		JDK8中彻底放弃了Segment转而采用的是Node，其设计思想也不再是JDK1.7中的分段锁思想。
+		
+		Node：保存key，value及key的hash值的数据结构。其中value和next都用volatile修饰，保证并发的可见性。
+		
+		Java8 ConcurrentHashMap结构基本上和Java8的HashMap一样，不过保证线程安全性。
+		
+		在JDK8中ConcurrentHashMap的结构，由于引入了红黑树，使得ConcurrentHashMap的实现非常复杂，我们都知道，红黑树是一种性能非常好的二叉查找树，其查找性能为O（logN），
+			但是其实现过程也非常复杂，而且可读性也非常差，Doug Lea的思维能力确实不是一般人能比的，早期完全采用链表结构时Map的查找时间复杂度为O（N），
+			JDK8中ConcurrentHashMap在链表的长度大于某个阈值的时候会将链表转换成红黑树进一步提高其查找性能。
+	}
+	
+	
+	总结：{
+		其实可以看出JDK1.8版本的ConcurrentHashMap的数据结构已经接近HashMap，相对而言，ConcurrentHashMap只是增加了同步的操作来控制并发，
+			从JDK1.7版本的ReentrantLock+Segment+HashEntry，到JDK1.8版本中synchronized+CAS+HashEntry+红黑树。
+
+			1/数据结构：取消了Segment分段锁的数据结构，取而代之的是数组+链表+红黑树的结构。
+			2/保证线程安全机制：JDK1.7采用segment的分段锁机制实现线程安全，其中segment继承自ReentrantLock。JDK1.8采用CAS+Synchronized保证线程安全。
+			3/锁的粒度：原来是对需要进行数据操作的Segment加锁，现调整为对每个数组元素加锁（Node）。
+			4/链表转化为红黑树:定位结点的hash算法简化会带来弊端,Hash冲突加剧,因此在链表节点数量大于8时，会将链表转化为红黑树进行存储。
+			5/查询时间复杂度：从原来的遍历链表O(n)，变成遍历红黑树O(logN)。
+	}
+	
+	
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
